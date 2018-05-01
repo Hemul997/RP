@@ -3,6 +3,8 @@ if %~1 == "" goto err
 
 start /wait /d Frontend dotnet publish -o ..\..\Builds\%~1\Frontend
 start /wait /d Backend dotnet publish -o ..\..\Builds\%~1\Backend
+start /wait /d TextListener dotnet publish -o ..\..\Builds\%~1\TextListener
+start /wait /d TextRancCalc dotnet publish -o ..\..\Builds\%~1\TextRancCalc
 
 start /wait xcopy config ..\Builds\%~1\config /I
 start /wait xcopy run.cmd ..\Builds\%~1

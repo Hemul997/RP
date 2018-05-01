@@ -44,11 +44,6 @@ namespace TextListener
                 Console.WriteLine(msg + " : " + value);
                 subscription.Ack(basicDeliveryEventArgs);
             }
-
-            if (channel != null)
-            {
-                channel.Close();
-            }
         }
 
         public static void Main(string[] args)

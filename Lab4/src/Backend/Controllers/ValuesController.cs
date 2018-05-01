@@ -29,8 +29,8 @@ namespace Backend.Controllers
         [HttpGet("{id}")]
         public string Get(string id)
         {
-            string value = null;
-            database.StringGet(id);
+            string value = "";
+            value = database.StringGet(id);
             return value;
         }
 
@@ -42,13 +42,12 @@ namespace Backend.Controllers
             };
             IConnection connection = factory.CreateConnection();
             IModel channel = connection.CreateModel();
-            channel.QueueDeclare(exchangeName, false, false, false, null);
-
+            channel.ExchangeDeclare(exchange: exchangeName, type: "fanout");
             string message = id;
             var body = Encoding.UTF8.GetBytes(message);
 
-            channel.BasicPublish(exchange: "",
-                        routingKey: exchangeName,
+            channel.BasicPublish(exchange: exchangeName,
+                        routingKey: "",
                         basicProperties: null,
                         body: body);
         }
@@ -57,8 +56,8 @@ namespace Backend.Controllers
         [HttpPost]
         public string Post(string value)
         {
-            if (value != null) {
-                Console.WriteLine(value);
+            if (value == null) {
+                return("Value is null");
             }
             var id = Guid.NewGuid().ToString();
             database.StringSet(id, value);
