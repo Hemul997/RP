@@ -4,44 +4,50 @@ using RabbitMQ.Client.Events;
 using RabbitMQ.Client.MessagePatterns;
 using StackExchange.Redis;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace TextListener
 {
     public class Program
     {
-        private static string GetValueByKeyAndHostName(string id, string hostName)
+        private const string HOST_NAME = "localhost";
+        private const string EXCHANGE_NAME = "backend-api";
+
+        private static string GetValueById(string id)
         {
-            IConnectionMultiplexer redisChannel = ConnectionMultiplexer.Connect(hostName);
-            IDatabase database = redisChannel.GetDatabase();
+            IConnectionMultiplexer redisChannel = ConnectionMultiplexer.Connect(HOST_NAME);
+            IDatabase redisDB = redisChannel.GetDatabase();
             string value = "";
-            value = database.StringGet(id);
+            value = redisDB.StringGet(id);
             return value;
         }
 
         private static void RabbitListener()
-        {
-            string hostName = "localhost";
-            string exchangeName = "backend-api";
-
+        {          
             IConnectionFactory factory = new ConnectionFactory
             {
-                HostName = hostName
+                HostName = HOST_NAME
             };
             IConnection connection = factory.CreateConnection();
             IModel channel = connection.CreateModel();
             string queueName = channel.QueueDeclare().QueueName;
-            channel.ExchangeDeclare(exchange: exchangeName, type: "fanout");
+            channel.ExchangeDeclare(exchange: EXCHANGE_NAME, type: "fanout");
             channel.QueueBind(queue: queueName,
-                                exchange: exchangeName,
+                                exchange: EXCHANGE_NAME,
                                 routingKey: "");
 
              var consumer = new EventingBasicConsumer(channel);
                 consumer.Received += (model, ea) =>
                 {
                     var body = ea.Body;
-                    string id = Encoding.UTF8.GetString(body);                    
-                    string text = GetValueByKeyAndHostName(id, hostName);
-                    Console.WriteLine(text);
+                    string receivedMessage = Encoding.UTF8.GetString(body);
+                    var args = Regex.Split(receivedMessage, ":");
+                    if (args.Length == 2 && args[0].Equals("Text created")) {
+                        string id = args[1];
+                        string text = GetValueById(id);
+                        Console.WriteLine(text);
+                    }                 
+                    
                 };
                 channel.BasicConsume(queue: queueName,
                                     autoAck: true,
@@ -51,6 +57,7 @@ namespace TextListener
 
         public static void Main(string[] args)
         {
+            Console.WriteLine("TextListener");
             RabbitListener();
         }
     }

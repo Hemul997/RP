@@ -8,10 +8,10 @@ using Microsoft.AspNetCore.Mvc;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using StackExchange.Redis;
+using System.Threading;
 
 namespace Backend.Controllers
 {
-    
     public class DataObject {
         public string data {get; set;}
     }
@@ -19,34 +19,64 @@ namespace Backend.Controllers
     [Route("api/[controller]")]
     public class ValuesController : Controller
     {
-        const string hostName = "localhost";
-        const string exchangeName = "backend-api"; 
-        private static IConnectionMultiplexer redisChannel = ConnectionMultiplexer.Connect(hostName);
-        IDatabase database = redisChannel.GetDatabase();
+        private const string HOST_NAME = "localhost";
+        private const string EXCHANGE_NAME = "backend-api"; 
+        private static IConnectionMultiplexer redisChannel = ConnectionMultiplexer.Connect(HOST_NAME);
+        private static IDatabase redisDB = redisChannel.GetDatabase();
 
+
+        private IActionResult GetRankFromDbById(string id)
+        {
+            int tryCount = 5;
+            int sleepTime = 100;
+
+            string value = null;
+            for(int i = 0; i < tryCount; i++)
+            {   
+                value = redisDB.StringGet("TextRankGuid_" + id);
+                if(value == null) 
+                {
+                    Thread.Sleep(sleepTime);
+                } 
+                else 
+                {
+                    break;
+                }                
+            }   
+
+            IActionResult result = null;
+            if(value != null)          
+            {
+                result = Ok(value);
+            } 
+            else 
+            {
+                result = new NotFoundResult();
+            }            
+            
+            return result;
+        }
 
         // GET api/values/<id>
         [HttpGet("{id}")]
-        public string Get(string id)
-        {
-            string value = "";
-            value = database.StringGet(id);
-            return value;
+        public IActionResult Get(string id)
+        {           
+            return GetRankFromDbById(id);
         }
 
         private static void AddIdToExchange(string id) 
         {
             IConnectionFactory factory = new ConnectionFactory
             {
-                HostName = hostName
+                HostName = HOST_NAME
             };
             IConnection connection = factory.CreateConnection();
             IModel channel = connection.CreateModel();
-            channel.ExchangeDeclare(exchange: exchangeName, type: "fanout");
-            string message = id;
+            channel.ExchangeDeclare(exchange: EXCHANGE_NAME, type: "fanout");
+            string message = "Text created:" + id;
             var body = Encoding.UTF8.GetBytes(message);
 
-            channel.BasicPublish(exchange: exchangeName,
+            channel.BasicPublish(exchange: EXCHANGE_NAME,
                         routingKey: "",
                         basicProperties: null,
                         body: body);
@@ -60,7 +90,7 @@ namespace Backend.Controllers
                 return("Value is null");
             }
             var id = Guid.NewGuid().ToString();
-            database.StringSet(id, value);
+            redisDB.StringSet(id, value);
             AddIdToExchange(id);
             return id;
         }
